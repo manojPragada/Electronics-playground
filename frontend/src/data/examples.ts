@@ -5764,38 +5764,50 @@ void loop() {
   // ─── ESP32 Examples ───────────────────────────────────────────────────────
   {
     id: 'esp32-blink-led',
-    title: 'ESP32 Blink LED',
+    title: 'ESP32 LED + I2C LCD Lesson',
     description:
-      'Blink the built-in LED on GPIO2 and an external red LED on GPIO4. Verifies ESP32 emulation is working.',
+      'Blink the built-in LED and a GPIO4 red LED while a 16x2 I2C LCD and Serial show the same state.',
     category: 'basics',
     difficulty: 'beginner',
     boardType: 'esp32',
-    code: `// ESP32 Blink LED
-// Blinks the built-in LED (GPIO2) and an external LED (GPIO4)
-// Requires arduino-esp32 2.0.17 (IDF 4.4.x) — see docs/ESP32_EMULATION.md
+    code: `// ESP32 DevKit V1 — LED + I2C LCD starter lesson
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 
+constexpr int LED_BUILTIN_PIN = 2;
+constexpr int LED_EXT_PIN = 4;
+constexpr int ON_TIME_MS = 1500; // Change this to 300 and press Run again.
 
-#define LED_BUILTIN_PIN 2   // Built-in blue LED on ESP32 DevKit
-#define LED_EXT_PIN     4   // External red LED
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
+void showState(bool on) {
+  digitalWrite(LED_BUILTIN_PIN, on ? HIGH : LOW);
+  digitalWrite(LED_EXT_PIN, on ? HIGH : LOW);
+
+  lcd.setCursor(0, 0);
+  lcd.print(on ? "LED ON          " : "LED OFF         ");
+  lcd.setCursor(0, 1);
+  lcd.print("GPIO4 + Serial  ");
+
+  Serial.println(on ? "LED ON" : "LED OFF");
+}
 
 void setup() {
   Serial.begin(115200);
   pinMode(LED_BUILTIN_PIN, OUTPUT);
   pinMode(LED_EXT_PIN, OUTPUT);
-  Serial.println("ESP32 Blink ready!");
+
+  Wire.begin(21, 22);
+  lcd.init();
+  lcd.backlight();
+  Serial.println("ESP32 lesson ready");
 }
 
 void loop() {
-  digitalWrite(LED_BUILTIN_PIN, HIGH);
-  digitalWrite(LED_EXT_PIN, HIGH);
-  Serial.println("LED ON");
-  delay(500);
-
-  digitalWrite(LED_BUILTIN_PIN, LOW);
-  digitalWrite(LED_EXT_PIN, LOW);
-  Serial.println("LED OFF");
-  delay(500);
+  showState(true);
+  delay(ON_TIME_MS);
+  showState(false);
+  delay(ON_TIME_MS);
 }`,
     components: [
       // 220 Ohm current-limiting resistor in series with the external LED —
@@ -5803,6 +5815,7 @@ void loop() {
       // well under the LED's 20 mA rating.
       { type: 'wokwi-resistor', id: 'r-led', x: 320, y: 205, properties: { value: '220' } },
       { type: 'wokwi-led', id: 'led-ext', x: 470, y: 190, properties: { color: 'red' } },
+      { type: 'wokwi-lcd1602-i2c', id: 'lcd-i2c', x: 360, y: 25, properties: {} },
     ],
     wires: [
       // GPIO4 → resistor → LED anode
@@ -5825,7 +5838,32 @@ void loop() {
         end: { componentId: 'arduino-uno', pinName: 'GND' },
         color: '#2c3e50',
       },
+      {
+        id: 'w-lcd-vcc',
+        start: { componentId: 'arduino-uno', pinName: '3V3' },
+        end: { componentId: 'lcd-i2c', pinName: 'VCC' },
+        color: '#e74c3c',
+      },
+      {
+        id: 'w-lcd-gnd',
+        start: { componentId: 'arduino-uno', pinName: 'GND' },
+        end: { componentId: 'lcd-i2c', pinName: 'GND' },
+        color: '#2c3e50',
+      },
+      {
+        id: 'w-lcd-sda',
+        start: { componentId: 'arduino-uno', pinName: '21' },
+        end: { componentId: 'lcd-i2c', pinName: 'SDA' },
+        color: '#3498db',
+      },
+      {
+        id: 'w-lcd-scl',
+        start: { componentId: 'arduino-uno', pinName: '22' },
+        end: { componentId: 'lcd-i2c', pinName: 'SCL' },
+        color: '#f39c12',
+      },
     ],
+    libraries: ['LiquidCrystal_I2C'],
   },
   {
     // The gallery had NO example using neopixel / led-ring / neopixel-matrix,

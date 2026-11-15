@@ -187,6 +187,18 @@
 
 /* ── Status line ────────────────────────────────────────────────────── */
 
+.compile-card__phase {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--color-fg-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.compile-card__phase strong { color: var(--color-fg-default); font-weight: 600; }
+.compile-card__hint { margin-top: 7px; color: var(--color-fg-muted); font-size: 11px; line-height: 1.4; }
+
 .compile-card__status {
   display: flex;
   align-items: baseline;

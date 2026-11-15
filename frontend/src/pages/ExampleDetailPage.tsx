@@ -17,7 +17,7 @@ import { AppHeader } from '../components/layout/AppHeader';
 import { ExampleThumbnail } from '../components/examples/ExampleThumbnail';
 import { useSEO } from '../utils/useSEO';
 
-const DOMAIN = 'https://velxio.dev';
+const DOMAIN = 'https://playground.24-144-111-117.sslip.io';
 
 const BOARD_LABELS: Record<string, string> = {
   'arduino-uno': 'Arduino Uno',
@@ -55,8 +55,8 @@ export const ExampleDetailPage: React.FC = () => {
 
   // SEO — called unconditionally (hooks must not be inside conditionals).
   const seoTitle = example
-    ? `${example.title} — Free Arduino Simulator Example | Velxio`
-    : 'Example Not Found | Velxio';
+    ? `${example.title} — Free Arduino Simulator Example | Pinloom`
+    : 'Example Not Found | Pinloom';
 
   const boardLabel = example
     ? (BOARD_LABELS[example.boardType ?? 'arduino-uno'] ?? example.boardType ?? 'Arduino Uno')
@@ -150,7 +150,7 @@ export const ExampleDetailPage: React.FC = () => {
           style={{ width: '100%', maxWidth: 760, marginBottom: 32, fontSize: 13, color: 'var(--wb-9)' }}
         >
           <Link to="/" style={{ color: 'var(--wb-9)', textDecoration: 'none' }}>
-            Velxio
+            Pinloom
           </Link>
           {' / '}
           <Link to="/examples" style={{ color: 'var(--wb-9)', textDecoration: 'none' }}>
@@ -369,7 +369,7 @@ export const ExampleDetailPage: React.FC = () => {
               url: `${DOMAIN}/examples/${example.id}`,
               educationalLevel: example.difficulty,
               learningResourceType: 'Simulation',
-              provider: { '@type': 'Organization', name: 'Velxio', url: DOMAIN },
+              provider: { '@type': 'Organization', name: 'Pinloom', url: DOMAIN },
               about: { '@type': 'Thing', name: boardLabel },
             }),
           }}

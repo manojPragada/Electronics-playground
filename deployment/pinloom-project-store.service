@@ -1,0 +1,23 @@
+[Unit]
+Description=Pinloom private project storage
+After=network.target
+
+[Service]
+Type=simple
+User=saimanoj
+Group=saimanoj
+WorkingDirectory=/home/saimanoj/velxio-playground
+Environment=PINLOOM_PROJECT_DIR=/home/saimanoj/velxio-playground/projects
+Environment=PINLOOM_ORIGIN=https://playground.24-144-111-117.sslip.io
+ExecStart=/usr/bin/python3 /home/saimanoj/velxio-playground/project_store.py
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/saimanoj/velxio-playground/projects
+MemoryMax=128M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target

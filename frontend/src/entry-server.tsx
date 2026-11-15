@@ -34,7 +34,7 @@ import { ImageToCodePage } from './pages/ImageToCodePage';
  */
 const EditorSeoSummary: React.FC = () => (
   <main>
-    <h1>Velxio Editor — multi-board circuit and code simulator</h1>
+    <h1>Pinloom Editor — multi-board circuit and code simulator</h1>
     <p>
       Write, compile and simulate Arduino, ESP32, ESP32-C3, ESP32-S3, Raspberry Pi
       Pico and Raspberry Pi code in your browser, wired to a live circuit canvas
@@ -107,9 +107,9 @@ export function render(path: string): string {
 export function getPrerenderedExampleRoutes() {
   return exampleProjects.map((e) => ({
     path: `/examples/${e.id}`,
-    title: `${e.title} — Free Arduino Simulator Example | Velxio`,
+    title: `${e.title} — Free Arduino Simulator Example | Pinloom`,
     description: `${e.description}. Run this example free in your browser — no install, no account required.`,
-    url: `https://velxio.dev/examples/${e.id}`,
+    url: `https://playground.24-144-111-117.sslip.io/examples/${e.id}`,
   }));
 }
 

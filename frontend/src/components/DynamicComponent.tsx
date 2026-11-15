@@ -11,7 +11,7 @@
  * - Handles component lifecycle
  */
 
-import React, { useRef, useEffect, useCallback, useReducer } from 'react';
+import React, { useRef, useEffect, useCallback, useReducer, useState } from 'react';
 import type { ComponentMetadata } from '../types/component-metadata';
 import {
   useSimulatorStore,
@@ -108,6 +108,7 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
   const elementRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
+  const [buzzerHz, setBuzzerHz] = useState<number | null>(null);
 
   const handleComponentEvent = useSimulatorStore((s) => s.handleComponentEvent);
   const running = useSimulatorStore((s) => s.running);
@@ -489,6 +490,18 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metadata.tagName, id]); // Only re-create if tagName or id changes
 
+  useEffect(() => {
+    if (metadata.id !== 'buzzer') return;
+    const element = elementRef.current;
+    if (!element) return;
+    const onPitch = (event: Event) => {
+      const hz = (event as CustomEvent<{ hz: number }>).detail?.hz;
+      if (Number.isFinite(hz)) setBuzzerHz(hz);
+    };
+    element.addEventListener('buzzer-audio-pitch', onPitch);
+    return () => element.removeEventListener('buzzer-audio-pitch', onPitch);
+  }, [metadata.id, metadata.tagName, id]);
+
   /**
    * Attach component-specific DOM events (like button presses)
    */
@@ -811,6 +824,18 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
     >
       {/* Container for web component */}
       <div ref={containerRef} className="web-component-container" />
+      {metadata.id === 'buzzer' && (
+        <span
+          data-testid="buzzer-frequency"
+          aria-live="polite"
+          style={{ position: 'absolute', top: '-24px', left: 0, padding: '2px 6px',
+            borderRadius: '4px', background: '#20242c', color: '#facc15',
+            fontSize: '11px', fontFamily: 'monospace', pointerEvents: 'none',
+            whiteSpace: 'nowrap', zIndex: 7 }}
+        >
+          {buzzerHz === null ? 'Buzzer: waiting' : `Buzzer: ${buzzerHz} Hz`}
+        </span>
+      )}
 
       {/* Live-controls hint: this chip has a slider/button panel — click it */}
       {showControlHint && !isBurnt && (

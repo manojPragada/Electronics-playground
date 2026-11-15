@@ -399,7 +399,7 @@ export const ComponentPickerModal: React.FC<ComponentPickerModalProps> = ({
   // hidden automatically in any build whose registry has the real component
   // (the hosted overlay merges it in) — same contract as VISIBLE_BOARD_ADS.
   const visibleComponentAds = useMemo(() => {
-    if (isLoading) return [];
+    if (isLoading || !import.meta.env.VITE_PRO_BUILD) return [];
     // An ad has no metadata object, so it is matched on its own category
     // against whichever branch the rail has selected.
     const selectedCat = selectedKey.startsWith('cat:')
@@ -438,7 +438,7 @@ export const ComponentPickerModal: React.FC<ComponentPickerModalProps> = ({
   );
 
   const matchingBoardAds = useMemo(
-    () => visibleBoardAds().filter((ad) => matchesSearch(searchQuery, [ad.label])),
+    () => import.meta.env.VITE_PRO_BUILD ? visibleBoardAds().filter((ad) => matchesSearch(searchQuery, [ad.label])) : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [searchQuery, proBoardsVersion],
   );

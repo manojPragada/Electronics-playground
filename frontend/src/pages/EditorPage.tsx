@@ -3,6 +3,7 @@
  */
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { startSimulation } from '../simulation/spice/start';
 import { useSEO } from '../utils/useSEO';
@@ -35,6 +36,9 @@ import { useAutoSaveProject } from '../hooks/useAutoSaveProject';
 import { registerEditorCommand } from '../lib/editorCommands';
 import { whenNewsClear } from '../lib/newsGate';
 import { EditorMenuBar } from '../components/editor/EditorMenuBar';
+import { ServerProjectsDialog } from '../components/editor/ServerProjectsDialog';
+import { activeServerProject, openServerProject, saveServerProject } from '../services/serverProjects';
+import { showMessageDialog } from '../store/useMessageDialogStore';
 import type { CompilationLog } from '../utils/compilationLogger';
 import '../App.css';
 
@@ -72,17 +76,32 @@ const resizeHandleStyle: React.CSSProperties = {
 };
 
 export const EditorPage: React.FC = () => {
+  const serverSaveEnabled = import.meta.env.VITE_PINLOOM_SERVER_SAVE === '1';
+  const [serverProjectsOpen, setServerProjectsOpen] = useState(false);
+  const savingToServer = useRef(false);
+  const navigate = useNavigate();
   const { t } = useTranslation();
   useSEO({
-    title: 'Multi-Board Simulator Editor — Arduino, ESP32, RP2040, RISC-V | Velxio',
+    title: 'Multi-Board Simulator Editor — Arduino, ESP32, RP2040, RISC-V | Pinloom',
     description:
       'Write, compile and simulate Arduino, ESP32, Raspberry Pi Pico, ESP32-C3, and Raspberry Pi 3 code in your browser. 19 boards, 5 CPU architectures, 48+ components. Free and open-source.',
-    url: 'https://velxio.dev/editor',
+    url: 'https://playground.24-144-111-117.sslip.io/editor',
   });
 
   // Silent auto-save for the loaded project (only fires when authed AND
   // currentProject has a UUID — see useAutoSaveProject for the gating rules).
   const autoSave = useAutoSaveProject();
+
+  // A saved project has its own URL, so refresh reopens the actual snapshot
+  // rather than the ESP32 starter that happens to use similar parts/wires.
+  useEffect(() => {
+    if (!serverSaveEnabled) return;
+    const id = new URLSearchParams(window.location.search).get('project');
+    if (!id || activeServerProject()?.id === id) return;
+    void openServerProject(id).catch((cause) => {
+      showMessageDialog(`Could not reopen the saved project: ${cause instanceof Error ? cause.message : String(cause)}`, { kind: 'error' });
+    });
+  }, [serverSaveEnabled]);
 
   const [editorWidthPct, setEditorWidthPct] = useState(45);
   // Desktop-only 3-way layout switch (code-only / circuit-only / both).
@@ -266,13 +285,26 @@ export const EditorPage: React.FC = () => {
   const simulatorHidden =
     (isMobile && mobileView !== 'circuit') || (!isMobile && viewMode === 'code');
 
-  // Save is dispatched to the pro overlay, which inspects auth state and
-  // shows the right modal (Save vs Login prompt). In OSS without the
-  // overlay this is a no-op today and becomes the .vlx Export entry
-  // point in Phase 4 of the OSS split.
+  const saveToDroplet = useCallback(async (saveAsNew = false) => {
+    if (savingToServer.current) return;
+    const current = activeServerProject();
+    const suggested = current?.name ?? useEditorStore.getState().files.find((file) => file.name.endsWith('.ino'))?.name.replace(/\.ino$/, '') ?? 'My project';
+    const name = !current || saveAsNew ? window.prompt('Project name on Droplet:', suggested)?.trim() : current.name;
+    if (!name) return;
+    savingToServer.current = true;
+    try {
+      const saved = await saveServerProject(name, saveAsNew);
+      navigate(`/editor?project=${encodeURIComponent(saved.id)}`, { replace: true });
+      showMessageDialog(`Saved “${saved.name}” to the Droplet.`, { kind: 'success' });
+    } catch (cause) {
+      showMessageDialog(`Could not save to the Droplet: ${cause instanceof Error ? cause.message : String(cause)}`, { kind: 'error' });
+    } finally { savingToServer.current = false; }
+  }, [navigate]);
+
   const handleSaveClick = useCallback(() => {
-    triggerSaveAction();
-  }, []);
+    if (serverSaveEnabled) void saveToDroplet();
+    else triggerSaveAction();
+  }, [serverSaveEnabled, saveToDroplet]);
 
   // "New workspace" opens the starter-template dialog. Destruction moved
   // from here into the dialog's selection handler — Cancel/ESC now leaves
@@ -310,16 +342,20 @@ export const EditorPage: React.FC = () => {
   // menu) so the menu never duplicates the confirm-dialog / autosave logic.
   useEffect(() => {
     const offSave = registerEditorCommand('project.save', handleSaveClick);
+    const offOpenServer = serverSaveEnabled ? registerEditorCommand('project.openServer', () => setServerProjectsOpen(true)) : () => {};
+    const offSaveAsServer = serverSaveEnabled ? registerEditorCommand('project.saveAsServer', () => { void saveToDroplet(true); }) : () => {};
     const offNew = registerEditorCommand('project.new', () => {
       void handleNewClick();
     });
     const offExplorer = registerEditorCommand('view.toggleExplorer', () => toggleExplorer());
     return () => {
       offSave();
+      offOpenServer();
+      offSaveAsServer();
       offNew();
       offExplorer();
     };
-  }, [handleSaveClick, handleNewClick, toggleExplorer]);
+  }, [handleSaveClick, handleNewClick, toggleExplorer, serverSaveEnabled, saveToDroplet]);
 
   // Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z — canvas undo/redo. Skipped when the
   // user is typing in any input/textarea/contenteditable so the Monaco
@@ -661,7 +697,7 @@ export const EditorPage: React.FC = () => {
                 }}
               >
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
-                  <FileExplorer onSaveClick={handleSaveClick} onNewClick={handleNewClick} autoSave={autoSave} />
+                  <FileExplorer onSaveClick={handleSaveClick} onNewClick={handleNewClick} onOpenServerClick={serverSaveEnabled ? () => setServerProjectsOpen(true) : undefined} autoSave={autoSave} />
                 </div>
                 {accountBlock && (
                   <div className="explorer-account-footer">{accountBlock}</div>
@@ -821,7 +857,7 @@ export const EditorPage: React.FC = () => {
         </div>
       </div>
 
-      {showStarBanner && (
+      {showStarBanner && import.meta.env.VITE_PRO_BUILD && (
         <GitHubStarBanner
           onClose={handleDismissStarBanner}
           onStarClick={handleStarClick}
@@ -833,6 +869,7 @@ export const EditorPage: React.FC = () => {
         isOpen={showNewProjectDialog}
         onClose={() => setShowNewProjectDialog(false)}
       />
+      {serverSaveEnabled && <ServerProjectsDialog open={serverProjectsOpen} onClose={() => setServerProjectsOpen(false)} onLoaded={(id) => navigate(`/editor?project=${encodeURIComponent(id)}`, { replace: true })} />}
       {/* Slot reserved for the private pro overlay (e.g. agent chat panel).
           Self-hosted builds without an overlay see nothing here. */}
       <div data-velxio-slot="agent-chat" />

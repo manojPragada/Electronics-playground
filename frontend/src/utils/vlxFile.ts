@@ -35,6 +35,8 @@ import type { Wire } from '../types/wire';
 import { useEditorStore, chipFileGroupId } from '../store/useEditorStore';
 import { useSimulatorStore } from '../store/useSimulatorStore';
 import { useProjectStore } from '../store/useProjectStore';
+import { clearActiveServerProject } from '../services/serverProjects';
+import { useCanvasViewportStore, type CanvasViewport } from '../store/useCanvasViewportStore';
 
 const VLX_FORMAT = 'velxio-project';
 const VLX_VERSION = 1;
@@ -64,6 +66,10 @@ export interface VlxPayload {
   components: Component[];
   wires: Wire[];
   activeBoardId: string | null;
+  /** Canvas camera, so reopening lands on the same visible arrangement. */
+  viewport?: CanvasViewport;
+  /** Visual stacking order of overlapping parts and boards. */
+  zOrders?: Record<string, number>;
 }
 
 function serialisableBoard(b: BoardInstance) {
@@ -127,6 +133,8 @@ export function buildVlxPayload(opts: { name?: string } = {}): VlxPayload {
     components: sim.components,
     wires: sim.wires,
     activeBoardId: sim.activeBoardId,
+    viewport: { pan: useCanvasViewportStore.getState().pan, zoom: useCanvasViewportStore.getState().zoom },
+    zOrders: sim.zOrders,
   };
 }
 
@@ -192,7 +200,7 @@ function validatePayload(data: unknown): VlxPayload {
   }
   if (data.format !== VLX_FORMAT) {
     throw new VlxParseError(
-      `Not a Velxio project file (expected format="${VLX_FORMAT}", got ${JSON.stringify(
+      `Not a compatible .vlx project file (expected format="${VLX_FORMAT}", got ${JSON.stringify(
         data.format,
       )}).`,
     );
@@ -202,7 +210,7 @@ function validatePayload(data: unknown): VlxPayload {
   }
   if (data.version > VLX_VERSION) {
     throw new VlxParseError(
-      `This file uses .vlx format version ${data.version}, but this Velxio supports up to v${VLX_VERSION}. Update Velxio to open it.`,
+      `This file uses .vlx format version ${data.version}, but this Pinloom version supports up to v${VLX_VERSION}. Update Pinloom to open it.`,
     );
   }
   if (!Array.isArray(data.boards)) {
@@ -250,8 +258,12 @@ export async function parseVlxFile(file: File): Promise<VlxPayload> {
  * simulator stores via `loadProjectState`. Returns the parsed payload
  * so the caller can show a confirmation toast or similar.
  */
-export async function importVlxFile(file: File): Promise<VlxPayload> {
+export async function importVlxFile(file: File, opts: { fromServer?: boolean } = {}): Promise<VlxPayload> {
   const payload = await parseVlxFile(file);
+  clearActiveServerProject();
+  if (!opts.fromServer && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('project')) {
+    window.history.replaceState(null, '', '/editor');
+  }
   // CRITICAL — sever the current project identity BEFORE mutating any store
   // (same guard as loadExample.ts). With a saved project open, the auto-save
   // hook would otherwise see the imported content as dirty edits on the OLD
@@ -265,6 +277,8 @@ export async function importVlxFile(file: File): Promise<VlxPayload> {
     components: payload.components,
     wires: payload.wires,
     activeBoardId: payload.activeBoardId,
+    zOrders: payload.zOrders,
   });
+  useCanvasViewportStore.getState().restore(payload.viewport);
   return payload;
 }

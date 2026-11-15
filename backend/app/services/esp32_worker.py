@@ -29,7 +29,7 @@ stdout        : JSON event lines (one per line, flushed immediately)
                {"type": "gpio_dir",     "pin": N,  "dir": V}
                {"type": "gpio_pull",    "pin": N,  "pull": V}   # 0=none 1=up 2=down
                {"type": "uart_tx",      "uart": N, "byte": V}
-               {"type": "ledc_duty",    "channel": N, "duty_pct": F}
+               {"type": "ledc_duty",    "channel": N, "duty_pct": F, "freq_hz": N}
                {"type": "rmt_event",    "channel": N, ...}   (only with VELXIO_RMT_ITEMS=1)
                {"type": "ws2812_update","channel": N, "pixels": [...]}
                {"type": "i2c_event",    "bus": N, "addr": N, "event": N, "response": N}
@@ -1690,6 +1690,25 @@ def main() -> None:  # noqa: C901  (complexity OK for inline worker)
                     sensor['responding'] = False
             return True
 
+    def _ledc_frequency(channel: int) -> int | None:
+        """Read the timer selected by an LEDC channel from QEMU's own state.
+
+        Internals 4 and 5 expose channel CONF0 and timer frequency arrays.
+        Channels 0-7 use the high-speed timers; 8-15 use low-speed timers.
+        """
+        try:
+            conf_ptr = lib.qemu_picsimlab_get_internals(4)
+            freq_ptr = lib.qemu_picsimlab_get_internals(5)
+            if not conf_ptr or not freq_ptr or not 0 <= channel < 16:
+                return None
+            conf = (ctypes.c_uint32 * 16).from_address(conf_ptr)
+            freqs = (ctypes.c_uint32 * 8).from_address(freq_ptr)
+            timer = (conf[channel] & 0x3) + (4 if channel >= 8 else 0)
+            frequency = int(freqs[timer])
+            return frequency if frequency > 0 else None
+        except Exception:
+            return None
+
     # ── 5. ctypes callbacks (called from QEMU thread) ─────────────────────────
 
     def _on_pin_change(slot: int, value: int) -> None:
@@ -1816,9 +1835,15 @@ def main() -> None:  # noqa: C901  (complexity OK for inline worker)
                 # New canonical event (SignalRouter consumer): channel +
                 # duty only, no gpio.  The frontend resolves channel →
                 # signal_id → pins via its mirror.
-                _emit({'type': 'ledc_duty',
-                       'channel': ledc_ch,
-                       'duty_pct': intensity})
+                event = {'type': 'ledc_duty',
+                         'channel': ledc_ch,
+                         'duty_pct': intensity,
+                         'gpios': list(_signal_router.pins_for_signal(
+                             ledc_signal_for_channel(ledc_ch)))}
+                frequency = _ledc_frequency(ledc_ch)
+                if frequency is not None:
+                    event['freq_hz'] = frequency
+                _emit(event)
             return
 
         # ── DHT22: the push-pull release arrives as a direction change ───
@@ -3276,6 +3301,7 @@ def main() -> None:  # noqa: C901  (complexity OK for inline worker)
     def _ledc_poll_thread() -> None:
         # Track last-emitted duty to avoid flooding identical updates
         _last_duty = [0.0] * 16
+        _last_frequency = [None] * 16
         while not _stopped.wait(0.1):
             try:
                 ptr = lib.qemu_picsimlab_get_internals(6)  # LEDC_CHANNEL_DUTY
@@ -3292,14 +3318,22 @@ def main() -> None:  # noqa: C901  (complexity OK for inline worker)
                 _refresh_pin_pulls()
                 for ch in range(16):
                     duty_pct = float(arr[ch])
-                    if abs(duty_pct - _last_duty[ch]) < 0.01:
+                    frequency = _ledc_frequency(ch)
+                    if (abs(duty_pct - _last_duty[ch]) < 0.01
+                            and frequency == _last_frequency[ch]):
                         continue
                     _last_duty[ch] = duty_pct
+                    _last_frequency[ch] = frequency
                     if duty_pct > 0:
                         rounded = round(duty_pct, 2)
-                        _emit({'type': 'ledc_duty',
-                               'channel': ch,
-                               'duty_pct': rounded})
+                        event = {'type': 'ledc_duty',
+                                 'channel': ch,
+                                 'duty_pct': rounded,
+                                 'gpios': list(_signal_router.pins_for_signal(
+                                     ledc_signal_for_channel(ch)))}
+                        if frequency is not None:
+                            event['freq_hz'] = frequency
+                        _emit(event)
             except Exception:
                 pass
 

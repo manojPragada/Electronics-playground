@@ -40,7 +40,7 @@ export function starterBoard(id: string | undefined): string | undefined {
 
 /** <title> for a starter's editor page. */
 export function starterTitle(board: string): string {
-  return `New ${board} project — free online ${board} simulator | Velxio`;
+  return `New ${board} project — free online ${board} simulator | Pinloom`;
 }
 
 /** Meta description for a starter's editor page. */

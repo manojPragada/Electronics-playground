@@ -1,0 +1,11 @@
+Pinloom source and license
+
+Pinloom is a self-hosted adaptation of Velxio by David Montero Crespo and contributors.
+Upstream revision: 25f3251c303e54acbf65b88e56af3052bfc072c3
+License: GNU Affero General Public License, version 3 (AGPL-3.0).
+Original source: https://github.com/davidmonterocrespo24/velxio
+
+The complete corresponding source for this deployed version, including local
+changes, is available as /pinloom-source.tar.gz on this same site. The archive
+contains the upstream license and attribution files. No upstream endorsement
+is implied.

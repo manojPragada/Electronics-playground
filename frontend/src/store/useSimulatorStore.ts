@@ -960,15 +960,19 @@ export class Esp32BridgeShim {
 // race window.
 
 function makeLedcDutyHandler(boardId: string) {
-  return (duty: { channel: number; duty_pct: number; freq_hz?: number }) => {
+  return (duty: { channel: number; duty_pct: number; freq_hz?: number; gpios?: number[] }) => {
     const boardPm = pinManagerMap.get(boardId);
     const router = signalRouterMap.get(boardId);
-    if (!boardPm || !router) return;
+    if (!boardPm) return;
     const signalId = ledcSignalForChannel(duty.channel);
     // Multi-pin routing: one LEDC channel CAN legally drive multiple
     // pins via the GPIO Matrix (rare but documented in TRM). Iterate
     // all of them — each gets its own update.
-    for (const pin of router.pinsForSignal(signalId)) {
+    // A worker that knows the GPIO matrix sends the actual pads with each
+    // duty event. Prefer those so a missed/delayed routing notification cannot
+    // leave an ESP32 buzzer playing the digital 440 Hz fallback.
+    const pins = duty.gpios ?? router?.pinsForSignal(signalId) ?? [];
+    for (const pin of pins) {
       applyPinPwm(boardPm, pin, duty.duty_pct, duty.freq_hz);
     }
   };
@@ -1654,6 +1658,7 @@ interface SimulatorState {
     components: Component[];
     wires: Wire[];
     activeBoardId: string | null;
+    zOrders?: Record<string, number>;
   }) => void;
   updateBoard: (boardId: string, updates: Partial<BoardInstance>) => void;
   /** Turn a board 90 degrees clockwise and re-stamp its wire endpoints. */
@@ -2013,7 +2018,7 @@ export function appendHardwareSerial(boardId: string, chunk: string): void {
  * read at the NEXT Run; this is read while the blank panel is on screen.
  */
 export function appendSimulatorNote(boardId: string, text: string): void {
-  const line = `\r\n[Velxio] ${text}\r\n`;
+  const line = `\r\n[Pinloom] ${text}\r\n`;
   // A Linux board's console is a terminal fed by the bridge's serial callback,
   // not by the store: a note that only lands in serialOutput stays invisible
   // there until the terminal is mounted again. Send it down the path the
@@ -2118,7 +2123,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
   ): (message: string, code?: string) => void {
     return (message: string, code?: string) => {
       console.error(`[${boardKind}:${id}] ${message}`);
-      serialCallback(`\r\n[Velxio] ${message}\r\n`);
+      serialCallback(`\r\n[Pinloom] ${message}\r\n`);
       set((s) => {
         const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
         const isActive = s.activeBoardId === id;
@@ -2411,7 +2416,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       // here rather than crashing cryptically. Stop "running" and pop the
       // monitor open so the note is visible immediately.
       console.error(`[esp32:${id}] ${message}`);
-      serialCallback(`\r\n[Velxio] ${message}\r\n`);
+      serialCallback(`\r\n[Pinloom] ${message}\r\n`);
       set((s) => {
         const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
         const isActive = s.activeBoardId === id;
@@ -2973,6 +2978,8 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       setComponents(normalizedComponents);
       setWires(payload.wires);
       keepWireShapes(payload.wires);
+      const zOrders = payload.zOrders ?? {};
+      set({ zOrders, zTop: Math.max(0, ...Object.values(zOrders).filter(Number.isFinite)) });
 
       // Active board: prefer the saved one, fall back to the first.
       const targetActive =
@@ -3450,7 +3457,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         );
         refuse(
           areProBoardsSettled()
-            ? `The board "${board.boardKind}" is not available in this build of Velxio, so it cannot run.`
+            ? `The board "${board.boardKind}" is not available in this build of Pinloom, so it cannot run.`
             : `The board "${board.boardKind}" is still loading. Press Run again in a moment.`,
           'board_kind_unknown',
         );
@@ -3697,7 +3704,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           // A board the overlay registered without a simulator (createSimulator
           // returns none rather than an Uno's): nothing would run.
           makeRunRefusedHandler(boardId, board.boardKind, (ch) => appendSerial(boardId, ch), () => {})(
-            `The board "${board.boardKind}" has no simulator in this build of Velxio, so it cannot run.`,
+            `The board "${board.boardKind}" has no simulator in this build of Pinloom, so it cannot run.`,
             'board_no_simulator',
           );
           return;

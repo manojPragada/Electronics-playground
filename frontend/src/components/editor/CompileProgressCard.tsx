@@ -127,6 +127,8 @@ function summarize(entries: CompileProgressEntry[]) {
   }, 'low');
 
   const lastLine = entries.find((e) => e.lastLine)?.lastLine ?? '';
+  const stage = entries.find((e) => e.stage !== 'queued' && e.stage !== 'done')?.stage ?? (queued.length ? 'queued' : 'done');
+  const buildSeconds = Math.max(...entries.map((e) => e.buildSeconds));
 
   // Freeze the clock at the last completion. Without this the timer kept
   // running through the 1600 ms linger, so the final "Compiled successfully"
@@ -145,6 +147,8 @@ function summarize(entries: CompileProgressEntry[]) {
     determinate,
     load,
     lastLine,
+    stage,
+    buildSeconds,
     priority: entries.some((e) => e.priority),
     tier: entries[0]?.tier ?? 'local',
     boardCount: entries.length,
@@ -184,6 +188,15 @@ export function CompileProgressCard({ onShowOutput, inEditor }: CompileProgressC
   if (dismissedRun === runId) return null;
   const elapsed = Math.max(0, ((s.finishedAt ?? now) - s.startedAt) / 1000);
   const percent = Math.round(s.progress * 100);
+  const queueSeconds = Math.max(0, elapsed - s.buildSeconds);
+  const phase = {
+    queued: 'Waiting for the compiler',
+    preparing: 'Preparing toolchain',
+    compiling: 'Compiling source',
+    linking: 'Linking firmware',
+    packaging: 'Packaging firmware',
+    done: 'Finished',
+  }[s.stage];
 
   const title = s.allSettled
     ? s.failed
@@ -261,12 +274,16 @@ export function CompileProgressCard({ onShowOutput, inEditor }: CompileProgressC
         )}
       </div>
 
+      <div className="compile-card__phase">
+        <strong>{phase}</strong>
+        <span>{s.allQueued ? `Queued ${Math.floor(elapsed)}s` : `Build ${Math.floor(s.buildSeconds)}s${queueSeconds >= 2 ? ` · queued ${Math.floor(queueSeconds)}s` : ''}`}</span>
+      </div>
       <div className="compile-card__status">
         <span className="compile-card__stage" title={s.lastLine}>
           {s.allQueued
             ? t(
                 'editor.compileProgress.queuedHint',
-                'Your build is in the queue. It starts automatically and is never cancelled.',
+                'One build runs at a time on this server. Yours starts when the active build finishes.',
               )
             : s.lastLine || t('editor.compileProgress.preparing', 'Preparing the build...')}
         </span>
@@ -274,6 +291,9 @@ export function CompileProgressCard({ onShowOutput, inEditor }: CompileProgressC
           <span className="compile-card__percent">{percent}%</span>
         )}
       </div>
+      {!s.allQueued && !s.allSettled && s.label.toLowerCase().includes('esp32') && (
+        <div className="compile-card__hint">First ESP32 build compiles the framework. Later builds reuse its cache.</div>
+      )}
 
       <div className="compile-card__foot">
         <span className="compile-card__load">

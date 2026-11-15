@@ -40,7 +40,10 @@ function RootRoute(): ReactElement | null {
   const proHome = proRoutes.find((r) => r.index);
   if (proHome) return proHome.element;
   if (import.meta.env.VITE_PRO_BUILD && !settled) return null;
-  return <Navigate to="/editor" replace />;
+  // This self-hosted playground opens on the complete ESP32 lesson instead
+  // of an empty editor. The editor's New Project dialog still creates blank
+  // workspaces and every other supported board from scratch.
+  return <Navigate to="/example/esp32-blink-led" replace />;
 }
 
 const ROOT_ELEMENT: ReactElement = <RootRoute />;

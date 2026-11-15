@@ -445,6 +445,7 @@ interface ContextMenu {
 interface FileExplorerProps {
   onSaveClick: () => void;
   onNewClick: () => void;
+  onOpenServerClick?: () => void;
   /** Auto-save state of the loaded project. When present, the Save button
    *  is the save indicator: green = saved, orange = unsaved changes,
    *  pulsing = saving, red = save failed. Replaces the text pill the header
@@ -460,7 +461,7 @@ const SAVE_STATUS_CLASS: Record<AutoSaveState['status'], string> = {
   error: 'is-error',
 };
 
-export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick, onNewClick, autoSave }) => {
+export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick, onNewClick, onOpenServerClick, autoSave }) => {
   const { t } = useTranslation();
   // Hidden <input type="file"> we trigger via ref when the user clicks
   // the Open project button.  Accepts both .vlx (Velxio native) and .zip
@@ -939,11 +940,12 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick, onNewCl
           </button>
           <button
             className="file-explorer-save-btn"
-            title="Open project (.vlx Velxio or .zip Wokwi)"
+            title="Open project (.vlx or .zip Wokwi)"
             onClick={handleOpenProjectClick}
           >
             <IcoOpen />
           </button>
+          {onOpenServerClick && <button className="file-explorer-save-btn" title="Open from Droplet" aria-label="Open from Droplet" onClick={onOpenServerClick}>☁</button>}
           <input
             ref={fileInputRef}
             type="file"
@@ -960,8 +962,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick, onNewCl
           />
           <button
             className={`file-explorer-save-btn${autoSave ? ` ${SAVE_STATUS_CLASS[autoSave.status]}` : ''}`}
-            title={saveButtonTitle(t, autoSave)}
-            aria-label={saveButtonTitle(t, autoSave)}
+            title={onOpenServerClick ? 'Save to Droplet' : saveButtonTitle(t, autoSave)}
+            aria-label={onOpenServerClick ? 'Save to Droplet' : saveButtonTitle(t, autoSave)}
             onClick={onSaveClick}
           >
             <IcoSave />

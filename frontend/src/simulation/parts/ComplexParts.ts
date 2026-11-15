@@ -547,6 +547,8 @@ PartSimulationRegistry.register('buzzer', {
     let activeOsc: OscillatorNode | null = null; // the note currently sounding (one per click)
     let activeGain: GainNode | null = null;
     let isSounding = false;
+    let soundingHz: number | null = null;
+    const recentHz: number[] = [];
     // Once the pin is driven by hardware PWM (analogWrite/Timer), the PWM
     // handler owns the audio. The digital HIGH/LOW path is only for tone()
     // (software pin toggling); on a PWM pin its ~490Hz carrier would otherwise
@@ -676,6 +678,10 @@ PartSimulationRegistry.register('buzzer', {
       PEAK * Math.sin(Math.PI * Math.min(1, Math.max(0, duty)));
 
     function startTone(freq: number, timeMs?: number) {
+      // The QEMU worker reports a duty change immediately and its periodic
+      // reconciliation can repeat the same nonzero duty. Keep one continuous
+      // oscillator for that note instead of restarting it on every repeat.
+      if (timeMs === undefined && activeOsc && soundingHz === freq) return;
       ensureCtx();
       const ctx = audioCtx!;
       const when = whenFor(timeMs); // the scheduler tracks ONSETS only (clean rhythm)
@@ -706,6 +712,12 @@ PartSimulationRegistry.register('buzzer', {
       };
       activeOsc = osc;
       activeGain = g;
+      soundingHz = freq;
+      const rounded = Math.round(freq);
+      if (recentHz.at(-1) !== rounded) recentHz.push(rounded);
+      if (recentHz.length > 8) recentHz.shift();
+      el.setAttribute?.('title', `Buzzer audio pitches: ${recentHz.join(' → ')} Hz`);
+      el.dispatchEvent?.(new CustomEvent('buzzer-audio-pitch', { detail: { hz: rounded } }));
       isSounding = true;
       if (el.playing !== undefined) el.playing = true;
     }
@@ -723,6 +735,7 @@ PartSimulationRegistry.register('buzzer', {
         releaseActive(off);
       }
       isSounding = false;
+      soundingHz = null;
       if (el.playing !== undefined) el.playing = false;
     }
 
@@ -753,7 +766,7 @@ PartSimulationRegistry.register('buzzer', {
           pwmActive = true;
           const cpu = (avrSimulator as any).cpu;
           if (dc > 0) {
-            const freq = cpu ? getFrequency(cpu) : 440;
+          const freq = pinManager.getPwmFreq?.(pinSIG) || (cpu ? getFrequency(cpu) : 440);
             dutyLevel = levelForDuty(dc);
             startTone(Math.max(20, Math.min(20000, freq)), timeMs);
           } else {
@@ -806,6 +819,7 @@ PartSimulationRegistry.register('buzzer', {
         activeGain = null;
       }
       isSounding = false;
+      soundingHz = null;
       pwmActive = false;
       if (el.playing !== undefined) el.playing = false;
       playWhen = null;

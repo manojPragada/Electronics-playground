@@ -31,7 +31,7 @@ import { AppHeader } from '../components/layout/AppHeader';
 import { useSEO } from '../utils/useSEO';
 import { starterBoard, starterTitle, starterDescription } from '../data/starters';
 
-const DOMAIN = 'https://velxio.dev';
+const DOMAIN = 'https://playground.24-144-111-117.sslip.io';
 
 export const ExampleEditorPage: React.FC = () => {
   // Re-render when the pro overlay registers late examples (dynamic import).
@@ -57,11 +57,11 @@ export const ExampleEditorPage: React.FC = () => {
     title: board
       ? starterTitle(board)
       : example
-        ? `${example.title} — Velxio Arduino Simulator`
-        : 'Example — Velxio',
+        ? `${example.title} — Pinloom Arduino Simulator`
+        : 'Example — Pinloom',
     description: board
       ? starterDescription(board)
-      : (example?.description ?? 'Arduino example running on Velxio.'),
+      : (example?.description ?? 'Arduino example running on Pinloom.'),
     url: example
       ? `${DOMAIN}/example/${example.id}`
       : `${DOMAIN}/examples`,

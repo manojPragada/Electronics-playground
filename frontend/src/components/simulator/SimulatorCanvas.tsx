@@ -15,6 +15,7 @@ import {
   subscribeProBoards,
 } from '../../lib/proBoardRegistry';
 import { useElectricalStore } from '../../store/useElectricalStore';
+import { useCanvasViewportStore } from '../../store/useCanvasViewportStore';
 import { openDeviceGateway } from '../../lib/openDeviceGateway';
 import { remoteBoardActions } from '../../simulation/remoteBoardAutostart';
 import React, { useEffect, useState, useRef, useCallback, useSyncExternalStore } from 'react';
@@ -536,13 +537,26 @@ export const SimulatorCanvas = ({ headerSlot }: SimulatorCanvasProps = {}) => {
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // Pan & zoom state
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState(() => useCanvasViewportStore.getState().pan);
+  const [zoom, setZoom] = useState(() => useCanvasViewportStore.getState().zoom);
   // Use refs during active pan to avoid setState lag
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 });
-  const panRef = useRef({ x: 0, y: 0 });
-  const zoomRef = useRef(1);
+  const panRef = useRef(useCanvasViewportStore.getState().pan);
+  const zoomRef = useRef(useCanvasViewportStore.getState().zoom);
+  const restoreRevision = useCanvasViewportStore((state) => state.restoreRevision);
+
+  useEffect(() => {
+    useCanvasViewportStore.getState().capture({ pan, zoom });
+  }, [pan, zoom]);
+
+  useEffect(() => {
+    const view = useCanvasViewportStore.getState();
+    panRef.current = view.pan;
+    zoomRef.current = view.zoom;
+    setPan(view.pan);
+    setZoom(view.zoom);
+  }, [restoreRevision]);
 
   // Board-less SPICE circuits (analog / digital examples with no MCU on
   // the canvas) have no concept of a board to "start", so `running` is

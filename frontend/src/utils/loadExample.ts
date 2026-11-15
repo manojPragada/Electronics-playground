@@ -12,6 +12,8 @@ import { useElectricalStore } from '../store/useElectricalStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { useVfsStore } from '../store/useVfsStore';
 import { serverProvidesGalleryLibraries } from '../services/galleryLibrariesGate';
+import { clearActiveServerProject } from '../services/serverProjects';
+import { useCanvasViewportStore } from '../store/useCanvasViewportStore';
 import { isBoardComponent } from './boardPinMapping';
 import { getInstalledLibraries, installLibrary } from '../services/libraryService';
 import { trackOpenExample } from './analytics';
@@ -100,6 +102,8 @@ export async function loadExample(
   example: ExampleProject,
   onLibraryProgress?: (progress: LibraryInstallProgress | null) => void,
 ): Promise<void> {
+  clearActiveServerProject();
+  useCanvasViewportStore.getState().restore();
   trackOpenExample(example.title);
 
   // CRITICAL — clear currentProject FIRST, before touching any other store.

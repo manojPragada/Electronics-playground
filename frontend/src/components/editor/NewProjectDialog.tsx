@@ -32,6 +32,8 @@ import { useProjectStore } from '../../store/useProjectStore';
 import { useEditorStore } from '../../store/useEditorStore';
 import { getLocaleFromPath, localizedPath } from '../../i18n/path';
 import { loadExample } from '../../utils/loadExample';
+import { clearActiveServerProject } from '../../services/serverProjects';
+import { useCanvasViewportStore } from '../../store/useCanvasViewportStore';
 import type { ExampleProject } from '../../data/examples';
 import { ExampleThumbnail } from '../examples/ExampleThumbnail';
 import { trackSelectBoard } from '../../utils/analytics';
@@ -105,6 +107,8 @@ function thumbStubFor(kind: string, label: string): ExampleProject {
  * sketch — pointing the editor at a nonexistent group blanks it.
  */
 export function clearWorkspaceForStarter(): void {
+  clearActiveServerProject();
+  useCanvasViewportStore.getState().restore();
   // currentProject FIRST — same auto-save hazard loadExample documents:
   // mutating the stores while a saved project is still "current" lets the
   // debounced PUT overwrite that project with the emptied content.
@@ -219,7 +223,7 @@ async function applyStarter(kind: string | 'blank'): Promise<void> {
   // stale project URL would remount the project route and reload it).
   const locale = getLocaleFromPath(window.location.pathname);
   const editorPath = localizedPath('/editor', locale);
-  if (window.location.pathname !== editorPath) {
+  if (window.location.pathname !== editorPath || window.location.search) {
     window.history.replaceState(null, '', editorPath);
   }
 }

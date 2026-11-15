@@ -20,6 +20,8 @@ export type EditorCommandId =
   | 'project.new'
   | 'project.save'
   | 'project.open'
+  | 'project.openServer'
+  | 'project.saveAsServer'
   | 'project.import'
   | 'project.export'
   | 'project.exportVlx'

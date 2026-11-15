@@ -21,6 +21,7 @@
 
 import { importVlxFile, VlxParseError } from './vlxFile';
 import { importFromWokwiZip } from './wokwiZip';
+import { clearActiveServerProject } from '../services/serverProjects';
 import type { ImportResult } from './wokwiZip';
 
 /**
@@ -63,13 +64,17 @@ export async function importProjectFile(file: File): Promise<ProjectImportResult
   }
 
   if (lower.endsWith('.zip')) {
+    clearActiveServerProject();
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('project')) {
+      window.history.replaceState(null, '', '/editor');
+    }
     const result = await importFromWokwiZip(file);
     return { kind: 'zip', ...result };
   }
 
   throw new Error(
     `Unsupported project file: ${file.name}.\n` +
-      `Velxio accepts .vlx (Velxio projects) and .zip (Wokwi bundles).`,
+      `Pinloom accepts .vlx projects and .zip (Wokwi bundles).`,
   );
 }
 

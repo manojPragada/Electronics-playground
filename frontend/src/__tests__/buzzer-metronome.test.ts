@@ -131,6 +131,25 @@ function notes() {
   return out;
 }
 
+it('plays the reported ESP32 PWM frequency instead of a fixed pitch', () => {
+  const { sim } = setupBuzzer();
+  sim.cpu = null;
+  let reportedFrequency = 500;
+  sim.pinManager.getPwmFreq = vi.fn(() => reportedFrequency);
+  const pwm = sim.pinManager.onPwmChange.mock.calls[0][1] as (
+    pin: number, duty: number, timeMs?: number,
+  ) => void;
+
+  pwm(11, 0.5, 0);
+  pwm(11, 0, 50);
+  reportedFrequency = 2000;
+  pwm(11, 0.5, 100);
+
+  expect(sched.filter((event) => event.kind === 'start').map((event) => event.freq)).toEqual([
+    500, 2000,
+  ]);
+});
+
 describe('Buzzer — metronome quality', () => {
   it('plays an even metronome with an accent on the down-beat', () => {
     const { hit } = setupBuzzer();
