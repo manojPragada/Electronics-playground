@@ -1781,7 +1781,10 @@ export const SimulatorCanvas = ({ headerSlot }: SimulatorCanvasProps = {}) => {
     // self-contained, and every custom-chip pipeline (files, controls,
     // compile) applies with no special-casing past this point.
     const isUserChip = metadata.custom && metadata.tagName === 'velxio-custom-chip';
-    const effectiveMetadata = isUserChip
+    // A ready-made picker chip (SX1262 LoRa, ...) drops the same way, but it
+    // is not the user's own: it goes straight onto the canvas, no editor.
+    const isChipPreset = !!metadata.chipPreset && metadata.tagName === 'velxio-custom-chip';
+    const effectiveMetadata = isUserChip || isChipPreset
       ? {
           ...(ComponentRegistry.getInstance().getById('custom-chip') ?? metadata),
           defaultValues: { ...metadata.defaultValues },
@@ -1801,7 +1804,7 @@ export const SimulatorCanvas = ({ headerSlot }: SimulatorCanvasProps = {}) => {
     // A fresh Custom Chip has no source yet — open the examples gallery so
     // the user picks a starting point. A dropped library chip already
     // carries source + compiled wasm; it goes straight to the editor.
-    if (effectiveMetadata.id === 'custom-chip') {
+    if (effectiveMetadata.id === 'custom-chip' && !isChipPreset) {
       if (isUserChip) openChipInEditor(component.id);
       else setCustomChipComponentId(component.id);
     }

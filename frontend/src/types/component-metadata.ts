@@ -66,6 +66,11 @@ export interface ComponentMetadata {
   // library, merged into the registry by the overlay). Renders a CUSTOM pill
   // on the picker card / hover panel / part inspector. Never set by OSS.
   custom?: boolean;
+  // A ready-made chip offered in the picker (services/chipPresetComponents.ts).
+  // Choosing it drops a normal custom-chip component pre-filled from
+  // defaultValues (sourceC, chipJson); it is not saved by the user, so it gets
+  // no CUSTOM pill and does not open the chip editor.
+  chipPreset?: boolean;
 }
 
 export interface ComponentMetadataCollection {

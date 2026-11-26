@@ -5,6 +5,7 @@
  * Loads from components-metadata.json generated at build time.
  */
 
+import { chipPresetComponents } from './chipPresetComponents';
 import { prepareSearchFields, rankBySearch, type PreparedSearchFields } from '../utils/searchMatch';
 import { componentSearchKeywords } from '../data/componentSearchKeywords';
 import type {
@@ -221,6 +222,9 @@ export class ComponentRegistry {
         pinCount: 0,
         tags: ['custom', 'chip', 'wasm', 'c', 'wokwi', 'eeprom', 'rtc', 'logic', 'cpu', '8080', 'z80'],
       });
+
+      // Ready-made chips (SX1262 LoRa, ...) so the picker finds them by name.
+      data.components.push(...chipPresetComponents());
 
       this.processMetadata(data.components);
       this.loaded = true;
