@@ -96,6 +96,8 @@ app.include_router(compile.router, prefix="/api/compile", tags=["compilation"])
 app.include_router(compile_chip.router, prefix="/api/compile-chip", tags=["custom-chips"])
 app.include_router(compile_rom.router, prefix="/api/compile-rom", tags=["custom-chips"])
 app.include_router(libraries.router, prefix="/api/libraries", tags=["libraries"])
+from app.api.routes import parts
+app.include_router(parts.router, prefix="/api/parts", tags=["parts"])
 # MicroPython libraries (issue #214): resolves the official micropython-lib
 # index into .py files the frontend writes into the board's workspace.
 app.include_router(

@@ -10,6 +10,10 @@ Exposes the following tools to MCP-compatible agents (e.g. Claude):
   - create_circuit        Create a new circuit definition
   - update_circuit        Merge changes into an existing circuit definition
   - generate_code_files   Generate starter Arduino code from a circuit
+  - define_part           Define a new module/breakout/board part (pins, face, optional C model)
+  - list_parts            List parts defined so far
+  - delete_part           Remove a defined part
+  - export_parts_for_deploy  Write parts into frontend/public/parts so a build ships them
 
 Transport:
   - stdio  — run `python mcp_server.py` for Claude Desktop / CLI agents
@@ -29,6 +33,7 @@ from app.mcp.wokwi import (
     generate_arduino_sketch,
     parse_wokwi_diagram,
 )
+from app.services import part_library
 from app.services.arduino_cli import ArduinoCLIService
 
 # ---------------------------------------------------------------------------
@@ -405,3 +410,136 @@ async def generate_code_files(
         "files": [{"name": f"{sketch_name}.ino", "content": sketch_content}],
         "board_fqbn": board_fqbn,
     }
+
+
+# ---------------------------------------------------------------------------
+# Runtime part library: define_part / list_parts / delete_part / export
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def define_part(
+    id: Annotated[str, "Lowercase id with dashes, e.g. 'e22-lora-module'. Defining the same id again replaces the part."],
+    name: Annotated[str, "Name shown in the picker, e.g. 'E22 LoRa Module (SX1262)'."],
+    pins: Annotated[
+        list[dict[str, Any]],
+        "Every wireable pad as {name, x, y}. x and y are pixels from the TOP-LEFT of the body "
+        "(same coordinate space as face_svg). Names are what wires and C source refer to "
+        "(use the silkscreen names printed on the real part).",
+    ],
+    body: Annotated[
+        dict[str, Any] | None,
+        "{width, height} of the part in pixels. Required when face_svg is given. "
+        "Typical: a 2x6 header at 20px pitch needs about 120 x 230.",
+    ] = None,
+    face_svg: Annotated[
+        str | None,
+        "Optional artwork: a complete <svg> whose coordinates are the BODY coordinates "
+        "(0,0 top-left, body.width x body.height). Draw the PCB, the chip, connectors; the pins "
+        "and their labels are drawn on top automatically. No scripts or external links.",
+    ] = None,
+    description: Annotated[str, "One or two sentences for the picker card."] = "",
+    category: Annotated[
+        str,
+        "Picker category: boards, sensors, displays, input, output, motors, communication, "
+        "connectivity, passive, logic, analog, electromech or other.",
+    ] = "other",
+    tags: Annotated[list[str] | None, "Short search tags, e.g. ['lora','radio']."] = None,
+    keywords: Annotated[list[str] | None, "Extra search words (not shown), e.g. alternative part names."] = None,
+    source_c: Annotated[
+        str | None,
+        "Optional C source that simulates the part (Velxio custom-chip API, velxio-chip.h). "
+        "Pins are looked up by name with vx_pin_register(\"NAME\", ...), so names must match "
+        "`pins`. Omit for a part that is only a wiring/visual breakout. It is compiled when "
+        "someone presses Run, not here.",
+    ] = None,
+) -> dict[str, Any]:
+    """
+    Define a new part (module, breakout or small carrier board) that appears in the
+    Add Component picker immediately, with no rebuild or redeploy.
+
+    Use this instead of asking a developer to add a component. The part is a custom
+    chip underneath: explicit pin positions, optional face artwork, optional C
+    simulation. It can NOT define a new CPU/MCU: emulated boards live in code. To put a
+    module's behaviour in the simulator, either reuse an existing chip model's source or
+    write source_c.
+
+    After defining, tell the user to open Add Component and search for the part name.
+    Call export_parts_for_deploy when the part should ship with a build (hosted site).
+    """
+    raw: dict[str, Any] = {
+        "id": id,
+        "name": name,
+        "pins": pins,
+        "description": description,
+        "category": category,
+        "tags": tags or [],
+        "keywords": keywords or [],
+    }
+    if body is not None:
+        raw["body"] = body
+    if face_svg:
+        raw["face_svg"] = face_svg
+    if source_c:
+        raw["source_c"] = source_c
+    try:
+        part = part_library.save_part(raw)
+    except part_library.PartError as exc:
+        return {"success": False, "error": str(exc)}
+    return {
+        "success": True,
+        "id": part["id"],
+        "pins": [p["name"] for p in part["pins"]],
+        "has_face": "face_svg" in part,
+        "has_model": "source_c" in part,
+        "stored_in": str(part_library.parts_dir()),
+        "next": f"Open Add Component and search '{part['name']}'. Refresh the editor tab if it was already open.",
+    }
+
+
+@mcp.tool()
+async def list_parts() -> dict[str, Any]:
+    """List the parts defined with define_part (id, name, category, pin names)."""
+    return {
+        "parts": [
+            {
+                "id": p["id"],
+                "name": p["name"],
+                "category": p["category"],
+                "pins": [pin["name"] for pin in p["pins"]],
+                "has_face": "face_svg" in p,
+                "has_model": "source_c" in p,
+            }
+            for p in part_library.list_parts()
+        ]
+    }
+
+
+@mcp.tool()
+async def delete_part(id: Annotated[str, "Id of the part to remove."]) -> dict[str, Any]:
+    """Remove a part defined with define_part. Parts already exported to the repo are not touched."""
+    try:
+        removed = part_library.delete_part(id)
+    except part_library.PartError as exc:
+        return {"success": False, "error": str(exc)}
+    return {"success": True, "removed": removed}
+
+
+@mcp.tool()
+async def export_parts_for_deploy() -> dict[str, Any]:
+    """
+    Write every defined part into frontend/public/parts/index.json (merged with the parts
+    the repo already ships). Commit that file and rebuild the frontend so the hosted site
+    offers the parts too. Does not commit, push or deploy anything.
+    """
+    try:
+        path, count = part_library.export_to_static()
+    except OSError as exc:
+        return {"success": False, "error": f"could not write the parts file: {exc}"}
+    return {
+        "success": True,
+        "file": str(path),
+        "parts_in_file": count,
+        "next": "git add frontend/public/parts/index.json, commit, then rebuild and upload the frontend.",
+    }
+

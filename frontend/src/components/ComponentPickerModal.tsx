@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { refreshPartLibrary } from '../services/partLibrary';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ComponentRegistry } from '../services/ComponentRegistry';
@@ -326,6 +327,10 @@ export const ComponentPickerModal: React.FC<ComponentPickerModalProps> = ({
   // The modal stays mounted (parent toggles `isOpen`), so reset the popover
   // when it closes — otherwise a panel left showing at close (e.g. clicking a
   // card to add it, or ESC while hovering) reappears detached on reopen.
+  // A part defined since the app loaded (MCP define_part) shows up on open.
+  useEffect(() => {
+    if (isOpen) void refreshPartLibrary();
+  }, [isOpen]);
   useEffect(() => {
     if (!isOpen) {
       showGenRef.current++;

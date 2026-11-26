@@ -117,6 +117,20 @@ class VelxioCustomChip extends HTMLElement {
     return [];
   }
 
+  /** Read optional `body: { width, height }` from chip.json: an exact body
+   *  size, so a face image drawn in body coordinates lines up with explicitly
+   *  positioned pins (parts defined at runtime rely on it). */
+  private _parseBody(): { width: number; height: number } | null {
+    try {
+      const obj = JSON.parse(this._chipJson || '{}');
+      const b = obj.body;
+      if (b && typeof b.width === 'number' && typeof b.height === 'number' && b.width >= 20 && b.height >= 20) {
+        return { width: b.width, height: b.height };
+      }
+    } catch { /* ignore */ }
+    return null;
+  }
+
   /** Read optional `display: { width, height }` from chip.json. */
   private _parseDisplay(): { width: number; height: number } | null {
     try {
@@ -174,6 +188,12 @@ class VelxioCustomChip extends HTMLElement {
     for (const p of explicit) {
       if (p.x !== undefined && p.x + 8 > width) width = p.x + 8;
       if (p.y !== undefined && p.y + 8 > height) height = p.y + 8;
+    }
+
+    const exact = this._parseBody();
+    if (exact) {
+      width = exact.width;
+      height = exact.height;
     }
 
     left.forEach((p, i) => {

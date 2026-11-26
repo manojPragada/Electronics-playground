@@ -34,6 +34,7 @@ import './components/velxio-components/Ds3231Element';
 import './components/velxio-components/GpsNeo6mElement';
 import './components/velxio-components/EPaperElement';
 import App from './App.tsx';
+import { startPartLibrary } from './services/partLibrary';
 
 // Configure monaco-editor for offline use via local static assets
 const monacoVsPath = `${import.meta.env.BASE_URL}monaco/vs`;
@@ -43,6 +44,9 @@ loader.config({ paths: { vs: monacoVsPath } });
 // elsewhere (the OS, another tab, the docs portal). index.html already put the
 // right theme on <html> before the first paint; this keeps it there.
 initTheme();
+
+// Parts defined at runtime (MCP define_part, /parts/index.json) join the picker.
+startPartLibrary();
 
 // Every deploy renames the hashed chunks and the old ones are gone from the
 // image. A tab opened before the deploy fails its next lazy import with

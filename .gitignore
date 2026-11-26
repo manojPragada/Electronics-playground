@@ -201,3 +201,6 @@ frontend/public/firmware/esp32*-rom.bin
 frontend/public/firmware/esp32*-drom.bin
 # Local deployment credential supplied by the operator. Never commit it.
 sudopassword.txt
+
+# Parts defined at runtime by the MCP define_part tool (export_parts_for_deploy ships the ones you want)
+backend/data/parts/

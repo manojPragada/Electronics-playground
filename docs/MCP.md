@@ -20,6 +20,10 @@ Velxio exposes a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP
 | `create_circuit` | Create a new circuit definition |
 | `update_circuit` | Merge changes into an existing circuit |
 | `generate_code_files` | Generate starter `.ino` code from a circuit |
+| `define_part` | Define a new module / breakout / small board (pins, face artwork, optional C model); it appears in the Add Component picker with no rebuild |
+| `list_parts` | List parts defined so far |
+| `delete_part` | Remove a defined part |
+| `export_parts_for_deploy` | Write the parts into `frontend/public/parts/index.json` so a normal build (and the hosted site) ships them |
 
 ---
 
@@ -298,3 +302,30 @@ cd backend
 pip install pytest pytest-asyncio
 python -m pytest tests/test_mcp_tools.py -v
 ```
+
+---
+
+## Defining parts on the fly (`define_part`)
+
+A part is a picker entry with a face and a pin list, and optionally C source that
+simulates it. Under the hood it is a custom chip with explicit pin positions, so
+everything the custom-chip pipeline does (wiring, Run compiling the source, chip nets)
+works unchanged. A part can be a module, a breakout or a small carrier board. It cannot
+be a new CPU: emulated boards live in code.
+
+How it flows:
+
+1. The agent calls `define_part` (id, name, `pins: [{name, x, y}]`, `body`, `face_svg`,
+   optional `source_c`). Coordinates are pixels from the top-left of the body, and the
+   face SVG is drawn in the same coordinates. The part is stored as JSON in
+   `backend/data/parts/` (override with `VELXIO_PARTS_DIR`).
+2. The backend serves them at `GET /api/parts/`. The editor reads that on start, on tab
+   focus and whenever the Add Component dialog opens, so the part shows up without a
+   rebuild.
+3. For the hosted site, call `export_parts_for_deploy`, commit
+   `frontend/public/parts/index.json` and rebuild the frontend. The static file needs no
+   backend. Parts the repo already ships (the E22 LoRa module) are kept.
+
+The E22 LoRa module is the first part defined this way; `scripts/generate-e22-part.py`
+regenerates it from the SX1262 model.
+
