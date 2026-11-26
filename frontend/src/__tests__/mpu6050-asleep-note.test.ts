@@ -36,7 +36,7 @@ const HEX = readFileSync(
   'utf-8',
 );
 
-const NOTE = '[Velxio] MPU6050 0x68 is in sleep mode: write 0x00 to PWR_MGMT_1 (0x6B) to wake it';
+const NOTE = '[Pinloom] MPU6050 0x68 is in sleep mode: write 0x00 to PWR_MGMT_1 (0x6B) to wake it';
 
 let seq = 0;
 

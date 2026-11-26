@@ -1,5 +1,5 @@
 /**
- * A note the simulator writes about a run ("[Velxio] e-paper: the panel
+ * A note the simulator writes about a run ("[Pinloom] e-paper: the panel
  * refreshed blank because...") has to be readable where the user is looking.
  *
  * On a Linux board that is the terminal, and the terminal is not fed by the
@@ -28,11 +28,11 @@ describe('appendSimulatorNote', () => {
 
     appendSimulatorNote(id, 'e-paper: the image went to 0x10 only');
 
-    expect(terminal.join('')).toContain('[Velxio] e-paper: the image went to 0x10 only');
+    expect(terminal.join('')).toContain('[Pinloom] e-paper: the image went to 0x10 only');
     await new Promise((r) => setTimeout(r, 50)); // the serial batcher flushes per frame
     const board = useSimulatorStore.getState().boards.find((b) => b.id === id);
-    expect(board?.serialOutput).toContain('[Velxio] e-paper: the image went to 0x10 only');
-    expect(board?.serialOutput.match(/\[Velxio\] e-paper/g)?.length, 'written once, not twice').toBe(1);
+    expect(board?.serialOutput).toContain('[Pinloom] e-paper: the image went to 0x10 only');
+    expect(board?.serialOutput.match(/\[Pinloom\] e-paper/g)?.length, 'written once, not twice').toBe(1);
   });
 
   it('still lands in the serial monitor of a board with no such bridge', async () => {
@@ -43,6 +43,6 @@ describe('appendSimulatorNote', () => {
 
     await new Promise((r) => setTimeout(r, 50));
     const board = useSimulatorStore.getState().boards.find((b) => b.id === id);
-    expect(board?.serialOutput).toContain('[Velxio] a note for an MCU board');
+    expect(board?.serialOutput).toContain('[Pinloom] a note for an MCU board');
   });
 });
