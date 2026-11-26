@@ -119,3 +119,22 @@ def test_export_merges_with_shipped_parts(tmp_path):
     path, _ = pl.export_to_static()
     names = {p["id"]: p["name"] for p in json.loads(path.read_text())["parts"]}
     assert names["shipped-part"] == "Newer"
+
+
+def test_auto_export_mirrors_changes_and_keeps_shipped_parts(tmp_path, monkeypatch):
+    shipped_file = tmp_path / "dist" / "index.json"
+    shipped_file.parent.mkdir()
+    shipped_file.write_text(json.dumps({"parts": [pl.validate_part(_part(id="shipped-part", name="Shipped"))]}))
+    monkeypatch.setenv("VELXIO_SHIPPED_PARTS_FILE", str(shipped_file))
+    monkeypatch.setenv("VELXIO_AUTO_EXPORT", "1")
+
+    ids = lambda: sorted(p["id"] for p in json.loads(pl.static_parts_file().read_text())["parts"])  # noqa: E731
+    pl.save_part(_part())
+    assert ids() == ["shipped-part", "test-module"]
+    pl.delete_part("test-module")
+    assert ids() == ["shipped-part"]
+
+
+def test_no_auto_export_unless_enabled():
+    pl.save_part(_part())
+    assert not pl.static_parts_file().exists()

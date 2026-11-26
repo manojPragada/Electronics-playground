@@ -1,0 +1,33 @@
+[Unit]
+Description=Pinloom MCP server (define_part and circuit tools for Claude Code)
+After=network.target
+
+[Service]
+User=saimanoj
+WorkingDirectory=/home/saimanoj/velxio-playground/src/backend
+ExecStart=/home/saimanoj/velxio-playground/mcp-venv/bin/python mcp_sse_server.py --host 127.0.0.1 --port 8002 --mount-path /mcp
+Restart=on-failure
+RestartSec=5
+
+# Where parts live. nginx serves index.json as /parts/index.json (see the vhost).
+StateDirectory=pinloom-parts
+StateDirectoryMode=0755
+Environment=VELXIO_PARTS_DIR=/var/lib/pinloom-parts/library
+Environment=VELXIO_STATIC_PARTS_FILE=/var/lib/pinloom-parts/index.json
+Environment=VELXIO_AUTO_EXPORT=1
+# Parts the current frontend build ships; merged under the library on every export.
+# Update the release id here after you deploy to a new releases/<id>.
+Environment=VELXIO_SHIPPED_PARTS_FILE=/home/saimanoj/velxio-playground/releases/25f3251c/dist/parts/index.json
+
+# The box has little RAM; this service should never take the playground down.
+MemoryMax=400M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

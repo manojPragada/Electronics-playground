@@ -2,7 +2,11 @@
 Velxio MCP Server — HTTP/SSE entry point
 
 Run this script to start the MCP server using the SSE transport, which is
-compatible with HTTP-based MCP clients (e.g. web applications, Cursor IDE).
+compatible with HTTP-based MCP clients (Claude Code, Cursor IDE, web apps).
+
+It binds to 127.0.0.1 by default and has NO authentication of its own: put it
+behind a reverse proxy that does (see deployment/nginx and
+deployment/pinloom-mcp.service).
 
 The SSE server runs on port 8002 by default (separate from the main FastAPI
 backend on port 8001) to avoid Starlette version conflicts.
@@ -33,7 +37,8 @@ from app.mcp.server import mcp  # noqa: E402
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Velxio MCP SSE Server")
-    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (keep 127.0.0.1 behind a reverse proxy)")
+    parser.add_argument("--mount-path", default="", help="URL prefix the reverse proxy serves this under, e.g. /mcp")
     parser.add_argument("--port", type=int, default=8002, help="Port to listen on")
     args = parser.parse_args()
 
@@ -43,5 +48,5 @@ if __name__ == "__main__":
     print(f"       create_circuit, update_circuit, generate_code_files,")
     print(f"       define_part, list_parts, delete_part, export_parts_for_deploy")
 
-    sse_app = mcp.sse_app()
+    sse_app = mcp.sse_app(mount_path=args.mount_path or None)
     uvicorn.run(sse_app, host=args.host, port=args.port)

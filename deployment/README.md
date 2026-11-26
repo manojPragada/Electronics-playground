@@ -71,3 +71,45 @@ snapshot instead of the default ESP32 example. The `.vlx` payload carries
 board and component positions, wire endpoint pin names and waypoints, visual
 stacking order, and canvas pan/zoom. Older `.vlx` files without camera data
 open at the default view. The root URL still opens the ESP32 lesson.
+
+## MCP over HTTPS (Claude Code connects here directly)
+
+Claude Code can talk to the playground's MCP server without a local checkout.
+The server is `backend/mcp_sse_server.py` (SSE transport), run by
+`pinloom-mcp.service` on 127.0.0.1:8002 and exposed by nginx at `/mcp/` behind
+its **own** login (`/etc/nginx/pinloom-mcp.htpasswd`, separate from the site's).
+It has no authentication of its own: never bind it to a public address.
+
+Tools: `define_part`, `list_parts`, `delete_part`, `export_parts_for_deploy`, plus
+the circuit tools. With `VELXIO_AUTO_EXPORT=1` every part change is written to
+`/var/lib/pinloom-parts/index.json`, which nginx serves as `/parts/index.json`
+(falling back to the build's own copy until a first part exists), so a new part
+is in the Add Component dialog the next time the editor opens it. No rebuild.
+
+Limits: `compile_project` and `run_project` need `arduino-cli` on the host and
+will report an error here; compile in the editor as before. A part can carry C
+that is compiled when someone presses Run, so treat the MCP password like a
+deploy key. Rotate it with `htpasswd` and reload nginx.
+
+Install (once):
+
+    sudo apt install -y apache2-utils python3-venv
+    cd /home/saimanoj/velxio-playground/src && git pull
+    python3 -m venv ../mcp-venv && ../mcp-venv/bin/pip install -r backend/requirements.txt
+    sudo cp deployment/pinloom-mcp.service /etc/systemd/system/
+    sudo htpasswd -c /etc/nginx/pinloom-mcp.htpasswd claude     # use a long random password
+    # add the two `location` blocks from deployment/nginx/*.conf to the live vhost
+    sudo nginx -t && sudo systemctl reload nginx
+    sudo systemctl daemon-reload && sudo systemctl enable --now pinloom-mcp
+    systemctl status pinloom-mcp --no-pager
+
+After deploying a frontend to a new `releases/<id>`, update
+`VELXIO_SHIPPED_PARTS_FILE` in the unit to that release and restart the service.
+
+Connect (on the machine running Claude Code):
+
+    claude mcp add --transport sse velxio \
+      https://playground.24-144-111-117.sslip.io/mcp/sse \
+      --header "Authorization: Basic $(printf 'claude:YOUR_PASSWORD' | base64)"
+    claude mcp list
+

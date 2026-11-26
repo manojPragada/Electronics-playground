@@ -54,6 +54,21 @@ def parts_dir() -> Path:
     return Path(__file__).resolve().parents[2] / "data" / "parts"
 
 
+def auto_export_enabled() -> bool:
+    """VELXIO_AUTO_EXPORT=1 mirrors every change into the static parts file.
+
+    On the server that file is the one nginx serves as /parts/index.json, so a
+    part defined over MCP is in the picker as soon as the editor reopens it.
+    """
+    return os.environ.get("VELXIO_AUTO_EXPORT", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def shipped_parts_file() -> Path | None:
+    """The parts a build ships (dist/parts/index.json); merged under the library on export."""
+    env = os.environ.get("VELXIO_SHIPPED_PARTS_FILE")
+    return Path(env) if env else None
+
+
 def static_parts_file() -> Path:
     """frontend/public/parts/index.json, next to the backend in a checkout."""
     env = os.environ.get("VELXIO_STATIC_PARTS_FILE")
@@ -227,6 +242,8 @@ def _atomic_write(path: Path, text: str) -> None:
 def save_part(raw: dict[str, Any]) -> dict[str, Any]:
     part = validate_part(raw)
     _atomic_write(parts_dir() / f"{part['id']}.json", json.dumps(part, indent=2))
+    if auto_export_enabled():
+        export_to_static()
     return part
 
 
@@ -250,28 +267,40 @@ def delete_part(part_id: str) -> bool:
     if not f.is_file():
         return False
     f.unlink()
+    if auto_export_enabled():
+        export_to_static(drop=part_id)
     return True
 
 
-def export_to_static() -> tuple[Path, int]:
-    """Merge the library into frontend/public/parts/index.json.
+def _read_parts_file(path: Path | None) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    if path is None or not path.is_file():
+        return out
+    try:
+        for p in json.loads(path.read_text(encoding="utf-8")).get("parts", []):
+            try:
+                v = validate_part(p)
+                out[v["id"]] = v
+            except PartError:
+                continue
+    except (OSError, ValueError):
+        pass
+    return out
 
-    Parts already in that file (the ones the repo ships) are kept; a library
-    part with the same id replaces them. Returns (path, total parts written).
+
+def export_to_static(drop: str | None = None) -> tuple[Path, int]:
+    """Merge the library into the static parts file (frontend/public/parts/index.json).
+
+    Precedence, lowest first: parts a build ships (VELXIO_SHIPPED_PARTS_FILE),
+    parts already in the target file, then the library. ``drop`` removes one id
+    afterwards (used when a part is deleted). Returns (path, total parts written).
     """
     target = static_parts_file()
-    merged: dict[str, dict[str, Any]] = {}
-    if target.is_file():
-        try:
-            for p in json.loads(target.read_text(encoding="utf-8")).get("parts", []):
-                try:
-                    v = validate_part(p)
-                    merged[v["id"]] = v
-                except PartError:
-                    continue
-        except (OSError, ValueError):
-            pass
+    merged = _read_parts_file(shipped_parts_file())
+    merged.update(_read_parts_file(target))
     for p in list_parts():
         merged[p["id"]] = p
+    if drop:
+        merged.pop(drop, None)
     _atomic_write(target, json.dumps({"parts": list(merged.values())}, indent=1))
     return target, len(merged)
